@@ -39,6 +39,15 @@ namespace Microsoft.Data.Entity
             }
         }
 
+        void IDbContextOptionsConstruction.AddOrUpdateExtension(EntityConfigurationExtension extension)
+        {
+            Check.NotNull(extension, "extension");
+
+            CheckNotLocked();
+
+            _extensions.Add(extension);
+        }
+
         void IDbContextOptionsConstruction.AddOrUpdateExtension<TExtension>(Action<TExtension> updater)
         {
             Check.NotNull(updater, "updater");

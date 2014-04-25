@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Open Technologies, Inc. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
+using Microsoft.Data.Entity.Migrations.Infrastructure;
 using Microsoft.Data.Entity.Migrations.Model;
 using Microsoft.Data.Entity.Relational.Model;
 using Microsoft.Data.Entity.Utilities;
@@ -298,10 +299,17 @@ namespace Microsoft.Data.Entity.Migrations.Tests
                         new DropColumnOperation("dbo.MyTable", "Bar")
                     };
 
+            var migration
+                = new MigrationMetadata("Name", "Timestamp")
+                      {
+                          UpgradeOperations = upgradeOperations,
+                          DowngradeOperations = downgradeOperations
+                      };
+
             var codeGenerator = new CSharpMigrationCodeGenerator();
             var stringBuilder = new IndentedStringBuilder();
 
-            codeGenerator.GenerateClass("MyNamespace", "MyClass", upgradeOperations, downgradeOperations, stringBuilder);
+            codeGenerator.GenerateClass("MyNamespace", "MyClass", migration, stringBuilder);
 
             Assert.Equal(
                 @"using System;

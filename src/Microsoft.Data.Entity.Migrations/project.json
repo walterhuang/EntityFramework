@@ -9,14 +9,21 @@
   },
   "code": "**\\*.cs;..\\Shared\\*.cs",
   "configurations": {
-    "net45": {},
+    "net45": {
+      "dependencies": {
+        "System.Data": ""
+      }
+    },
     "k10": {
       "dependencies": {
         "Microsoft.CSharp": "4.0.0.0",
         "System.Collections": "4.0.0.0",
+        "System.ComponentModel": "4.0.0.0",
+        "System.Diagnostics.Contracts": "4.0.0.0",
         "System.Diagnostics.Debug": "4.0.10.0",
         "System.Dynamic.Runtime": "4.0.0.0",
         "System.Globalization": "4.0.10.0",
+        "System.IO": "4.0.0.0",
         "System.Linq": "4.0.0.0",
         "System.Linq.Expressions": "4.0.0.0",
         "System.Reflection": "4.0.10.0",
@@ -35,6 +42,7 @@
         "System.Diagnostics.Debug": "",
         "System.Dynamic.Runtime": "",
         "System.Globalization": "",
+        "System.IO": "",
         "System.Linq": "",
         "System.Linq.Expressions": "",
         "System.Reflection": "",

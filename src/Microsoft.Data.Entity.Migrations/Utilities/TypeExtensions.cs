@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using JetBrains.Annotations;
 
 namespace Microsoft.Data.Entity.Migrations.Utilities
 {
@@ -13,6 +14,19 @@ namespace Microsoft.Data.Entity.Migrations.Utilities
         public static IEnumerable<PropertyInfo> GetNonIndexerProperties(this Type type)
         {
             return type.GetRuntimeProperties().Where(p => p.IsPublic() && !p.GetIndexParameters().Any());
+        }
+
+        public static ConstructorInfo GetDeclaredConstructor(this Type type, params Type[] parameterTypes)
+        {
+            return type.GetTypeInfo().DeclaredConstructors.SingleOrDefault(
+                c => !c.IsStatic && c.GetParameters().Select(p => p.ParameterType).SequenceEqual(parameterTypes));
+        }
+
+        public static ConstructorInfo GetPublicConstructor(this Type type, params Type[] parameterTypes)
+        {
+            var constructor = type.GetDeclaredConstructor(parameterTypes);
+
+            return constructor != null && constructor.IsPublic ? constructor : null;
         }
     }
 }
