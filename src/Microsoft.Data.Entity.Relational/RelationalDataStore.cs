@@ -83,7 +83,7 @@ namespace Microsoft.Data.Entity.Relational
             Check.NotNull(queryModel, "queryModel");
             Check.NotNull(stateManager, "stateManager");
 
-            var queryExecutor = new QueryModelVisitor().CreateQueryExecutor<TResult>(queryModel);
+            var queryExecutor = new QueryModelVisitor(Model).CreateQueryExecutor<TResult>(queryModel);
             var queryContext = new RelationalQueryContext(Model, Logger, stateManager, _connection, ValueReaderFactory);
 
             return queryExecutor(queryContext);
@@ -94,7 +94,7 @@ namespace Microsoft.Data.Entity.Relational
             Check.NotNull(queryModel, "queryModel");
             Check.NotNull(stateManager, "stateManager");
 
-            var queryExecutor = new AsyncQueryModelVisitor().CreateQueryExecutor<TResult>(queryModel);
+            var queryExecutor = new AsyncQueryModelVisitor(Model).CreateQueryExecutor<TResult>(queryModel);
             var queryContext = new RelationalQueryContext(Model, Logger, stateManager, _connection, ValueReaderFactory);
 
             return queryExecutor(queryContext);

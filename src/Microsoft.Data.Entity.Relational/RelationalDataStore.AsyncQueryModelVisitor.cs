@@ -15,6 +15,7 @@ using JetBrains.Annotations;
 using Microsoft.Data.Entity.Metadata;
 using Microsoft.Data.Entity.Query;
 using Microsoft.Framework.Logging;
+using Remotion.Linq.Clauses;
 using Remotion.Linq.Clauses.Expressions;
 using Remotion.Linq.Parsing;
 
@@ -24,24 +25,21 @@ namespace Microsoft.Data.Entity.Relational
     {
         private class AsyncQueryModelVisitor : AsyncEntityQueryModelVisitor
         {
-            public AsyncQueryModelVisitor()
-                : base(null)
+            public AsyncQueryModelVisitor(IModel model)
+                : base(model)
             {
             }
 
-            private AsyncQueryModelVisitor(EntityQueryModelVisitor parentQueryModelVisitor)
-                : base(parentQueryModelVisitor)
+            protected override ExpressionTreeVisitor CreateQueryingExpressionTreeVisitor(
+                IQuerySource querySource, bool isolateSubqueries = false)
             {
+                return new RelationalQueryingExpressionTreeVisitor(_model, isolateSubqueries);
             }
 
-            protected override ExpressionTreeVisitor CreateQueryingExpressionTreeVisitor(EntityQueryModelVisitor parentQueryModelVisitor)
+            protected override ExpressionTreeVisitor CreateProjectionExpressionTreeVisitor(
+                IQuerySource querySource, bool isolateSubqueries = false)
             {
-                return new RelationalQueryingExpressionTreeVisitor(parentQueryModelVisitor);
-            }
-
-            protected override ExpressionTreeVisitor CreateProjectionExpressionTreeVisitor(EntityQueryModelVisitor parentQueryModelVisitor)
-            {
-                return new RelationalProjectionSubQueryExpressionTreeVisitor(parentQueryModelVisitor);
+                return new RelationalProjectionSubQueryExpressionTreeVisitor(_model, isolateSubqueries);
             }
 
             private static readonly MethodInfo _entityScanMethodInfo
@@ -66,14 +64,14 @@ namespace Microsoft.Data.Entity.Relational
 
             private class RelationalQueryingExpressionTreeVisitor : QueryingExpressionTreeVisitor
             {
-                public RelationalQueryingExpressionTreeVisitor(EntityQueryModelVisitor parentQueryModelVisitor)
-                    : base(parentQueryModelVisitor)
+                public RelationalQueryingExpressionTreeVisitor(IModel model, bool isolateSubqueries)
+                    : base(model, isolateSubqueries)
                 {
                 }
 
                 protected override Expression VisitSubQueryExpression(SubQueryExpression expression)
                 {
-                    var queryModelVisitor = new AsyncQueryModelVisitor(_parentQueryModelVisitor);
+                    var queryModelVisitor = new AsyncQueryModelVisitor(_model) { _isRootVisitor = _isolateSubqueries };
 
                     queryModelVisitor.VisitQueryModel(expression.QueryModel);
 
@@ -90,14 +88,14 @@ namespace Microsoft.Data.Entity.Relational
 
             private class RelationalProjectionSubQueryExpressionTreeVisitor : RelationalQueryingExpressionTreeVisitor
             {
-                public RelationalProjectionSubQueryExpressionTreeVisitor(EntityQueryModelVisitor parentQueryModelVisitor)
-                    : base(parentQueryModelVisitor)
+                public RelationalProjectionSubQueryExpressionTreeVisitor(IModel model, bool isolateSubqueries)
+                    : base(model, isolateSubqueries)
                 {
                 }
 
                 protected override Expression VisitSubQueryExpression(SubQueryExpression expression)
                 {
-                    return VisitProjectionSubQuery(expression, new AsyncQueryModelVisitor(_parentQueryModelVisitor));
+                    return VisitProjectionSubQuery(expression, new AsyncQueryModelVisitor(_model));
                 }
             }
 

@@ -5,16 +5,16 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Data.Common;
-using System.Diagnostics.Contracts;
-using System.Linq;
+using System.Diagnostics;
 using System.Linq.Expressions;
 using System.Reflection;
-using System.Text;
 using JetBrains.Annotations;
 using Microsoft.Data.Entity.Metadata;
 using Microsoft.Data.Entity.Query;
 using Microsoft.Framework.Logging;
+using Remotion.Linq.Clauses;
 using Remotion.Linq.Clauses.Expressions;
+using Remotion.Linq.Clauses.ExpressionTreeVisitors;
 using Remotion.Linq.Parsing;
 
 namespace Microsoft.Data.Entity.Relational
@@ -23,185 +23,346 @@ namespace Microsoft.Data.Entity.Relational
     {
         private class QueryModelVisitor : EntityQueryModelVisitor
         {
-            public QueryModelVisitor()
-                : base(null)
+            private readonly Dictionary<IQuerySource, EntityQuery> _queriesBySource
+                = new Dictionary<IQuerySource, EntityQuery>();
+
+            private class EntityQuery
+            {
+                private readonly SqlSelect _sqlSelect = new SqlSelect();
+                private readonly Dictionary<IProperty, int> _propertyIndexes = new Dictionary<IProperty, int>();
+
+                public EntityQuery(string tableName)
+                {
+                    _sqlSelect.Table = tableName;
+                }
+
+                public void AddToProjection(IProperty property)
+                {
+                    if (!_propertyIndexes.ContainsKey(property))
+                    {
+                        _propertyIndexes
+                            .Add(property, _sqlSelect.AddToSelectList(property.StorageName));
+                    }
+                }
+
+                public int GetProjectionIndex(IProperty property)
+                {
+                    return _propertyIndexes[property];
+                }
+
+                public override string ToString()
+                {
+                    return _sqlSelect.ToString();
+                }
+            }
+
+            public QueryModelVisitor(IModel model)
+                : base(model)
             {
             }
 
-            private QueryModelVisitor(EntityQueryModelVisitor parentQueryModelVisitor)
-                : base(parentQueryModelVisitor)
+            protected override ExpressionTreeVisitor CreateQueryingExpressionTreeVisitor(
+                IQuerySource querySource, bool isolateSubqueries = false)
             {
+                return new RelationalQueryingExpressionTreeVisitor(this, querySource, isolateSubqueries);
             }
 
-            protected override ExpressionTreeVisitor CreateQueryingExpressionTreeVisitor(EntityQueryModelVisitor parentQueryModelVisitor)
+            protected override ExpressionTreeVisitor CreateProjectionExpressionTreeVisitor(
+                IQuerySource querySource, bool isolateSubqueries = false)
             {
-                return new RelationalQueryingExpressionTreeVisitor(parentQueryModelVisitor);
+                return new RelationalProjectionSubQueryExpressionTreeVisitor(
+                    this, querySource, isolateSubqueries);
             }
 
-            protected override ExpressionTreeVisitor CreateProjectionExpressionTreeVisitor(EntityQueryModelVisitor parentQueryModelVisitor)
+            protected override Expression ReplaceClauseReferences(
+                Expression expression, QuerySourceMapping querySourceMapping, bool throwOnUnmappedReferences)
             {
-                return new RelationalProjectionSubQueryExpressionTreeVisitor(parentQueryModelVisitor);
+                return new MemberAccessToValueReaderReferenceReplacingExpressionTreeVisitor(
+                    querySourceMapping, throwOnUnmappedReferences, this)
+                    .VisitExpression(expression);
             }
 
-            private static readonly MethodInfo _entityScanMethodInfo
-                = typeof(QueryModelVisitor).GetTypeInfo().GetDeclaredMethod("EntityScan");
-
-            [UsedImplicitly]
-            private static IEnumerable<TEntity> EntityScan<TEntity>(QueryContext queryContext)
+            private class MemberAccessToValueReaderReferenceReplacingExpressionTreeVisitor : ReferenceReplacingExpressionTreeVisitor
             {
-                var entityType = queryContext.Model.GetEntityType(typeof(TEntity));
+                private readonly QueryModelVisitor _queryModelVisitor;
 
-                var sql = new StringBuilder();
+                public MemberAccessToValueReaderReferenceReplacingExpressionTreeVisitor(
+                    QuerySourceMapping querySourceMapping,
+                    bool throwOnUnmappedReferences,
+                    QueryModelVisitor queryModelVisitor)
+                    : base(querySourceMapping, throwOnUnmappedReferences)
+                {
+                    _queryModelVisitor = queryModelVisitor;
+                }
 
-                sql.Append("SELECT ")
-                    .AppendJoin(entityType.Properties.Select(p => p.StorageName))
-                    .AppendLine()
-                    .Append("FROM ")
-                    .AppendLine(entityType.StorageName);
+                private static readonly MethodInfo _readValueMethodInfo
+                    = typeof(IValueReader).GetTypeInfo().GetDeclaredMethod("ReadValue");
 
-                return new Enumerable<TEntity>((RelationalQueryContext)queryContext, sql.ToString(), entityType);
+                public override Expression VisitExpression(Expression expression)
+                {
+                    return base.VisitExpression(expression);
+                }
+
+                protected override Expression VisitMemberExpression(MemberExpression expression)
+                {
+                    var newExpression = VisitExpression(expression.Expression);
+
+                    if (newExpression != expression.Expression)
+                    {
+                        if (newExpression.Type == typeof(IValueReader))
+                        {
+                            var querySourceReferenceExpression
+                                = (QuerySourceReferenceExpression)expression.Expression;
+
+                            var entityType
+                                = _queryModelVisitor._model
+                                    .GetEntityType(querySourceReferenceExpression.ReferencedQuerySource.ItemType);
+
+                            var property = entityType.GetProperty(expression.Member.Name);
+
+                            EntityQuery entityQuery;
+                            if (_queryModelVisitor._queriesBySource
+                                .TryGetValue(querySourceReferenceExpression.ReferencedQuerySource, out entityQuery))
+                            {
+                                return Expression.Call(
+                                    newExpression,
+                                    _readValueMethodInfo.MakeGenericMethod(expression.Type),
+                                    new Expression[] { Expression.Constant(entityQuery.GetProjectionIndex(property)) });
+                            }
+                        }
+
+                        return Expression.MakeMemberAccess(newExpression, expression.Member);
+                    }
+
+                    return expression;
+                }
             }
 
             private class RelationalQueryingExpressionTreeVisitor : QueryingExpressionTreeVisitor
             {
-                public RelationalQueryingExpressionTreeVisitor(EntityQueryModelVisitor parentQueryModelVisitor)
-                    : base(parentQueryModelVisitor)
+                private readonly QueryModelVisitor _queryModelVisitor;
+                private readonly IQuerySource _querySource;
+
+                public RelationalQueryingExpressionTreeVisitor(
+                    QueryModelVisitor queryModelVisitor, IQuerySource querySource, bool isolateSubqueries)
+                    : base(queryModelVisitor._model, isolateSubqueries)
                 {
+                    _queryModelVisitor = queryModelVisitor;
+                    _querySource = querySource;
                 }
 
                 protected override Expression VisitSubQueryExpression(SubQueryExpression expression)
                 {
-                    var queryModelVisitor = new QueryModelVisitor(_parentQueryModelVisitor);
+                    var queryModelVisitor = new QueryModelVisitor(_model) { _isRootVisitor = _isolateSubqueries };
 
                     queryModelVisitor.VisitQueryModel(expression.QueryModel);
 
                     return queryModelVisitor._expression;
                 }
 
+                protected override Expression VisitMemberExpression(MemberExpression expression)
+                {
+                    var querySourceReferenceExpression
+                        = expression.Expression as QuerySourceReferenceExpression;
+
+                    if (querySourceReferenceExpression != null)
+                    {
+                        var querySource = querySourceReferenceExpression.ReferencedQuerySource;
+
+                        if (!_queryModelVisitor.QuerySourceRequiresMaterialization(querySource))
+                        {
+                            var entityType = _model.TryGetEntityType(querySource.ItemType);
+
+                            if (entityType != null)
+                            {
+                                var property = entityType.TryGetProperty(expression.Member.Name);
+
+                                if (property != null)
+                                {
+                                    EntityQuery entityQuery;
+                                    if (_queryModelVisitor._queriesBySource.TryGetValue(querySource, out entityQuery))
+                                    {
+                                        entityQuery.AddToProjection(property);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    return base.VisitMemberExpression(expression);
+                }
+
                 protected override Expression VisitEntityQueryable(Type elementType)
                 {
+                    var queryMethodInfo = _queryValuesMethodInfo;
+                    var entityType = _model.GetEntityType(elementType);
+
+                    var entityQuery = new EntityQuery(entityType.StorageName);
+
+                    _queryModelVisitor._queriesBySource.Add(_querySource, entityQuery);
+
+                    if (_queryModelVisitor.QuerySourceRequiresMaterialization(_querySource))
+                    {
+                        foreach (var property in entityType.Properties)
+                        {
+                            entityQuery.AddToProjection(property);
+                        }
+
+                        queryMethodInfo = _queryEntitiesMethodInfo.MakeGenericMethod(elementType);
+                    }
+
                     return Expression.Call(
-                        _entityScanMethodInfo.MakeGenericMethod(elementType),
-                        _queryContextParameter);
+                        queryMethodInfo, _queryContextParameter, Expression.Constant(entityQuery));
+                }
+
+                private static readonly MethodInfo _queryValuesMethodInfo
+                    = typeof(RelationalQueryingExpressionTreeVisitor).GetTypeInfo()
+                        .GetDeclaredMethod("QueryValues");
+
+                [UsedImplicitly]
+                private static IEnumerable<IValueReader> QueryValues(QueryContext queryContext, EntityQuery entityQuery)
+                {
+                    var relationalQueryContext = (RelationalQueryContext)queryContext;
+
+                    return new Enumerable<IValueReader>(
+                        relationalQueryContext.Connection,
+                        entityQuery.ToString(),
+                        r => relationalQueryContext.ValueReaderFactory.Create(r),
+                        queryContext.Logger);
+                }
+
+                private static readonly MethodInfo _queryEntitiesMethodInfo
+                    = typeof(RelationalQueryingExpressionTreeVisitor).GetTypeInfo()
+                        .GetDeclaredMethod("QueryEntities");
+
+                [UsedImplicitly]
+                private static IEnumerable<TEntity> QueryEntities<TEntity>(QueryContext queryContext, EntityQuery entityQuery)
+                {
+                    var relationalQueryContext = ((RelationalQueryContext)queryContext);
+
+                    return new Enumerable<TEntity>(
+                        relationalQueryContext.Connection,
+                        entityQuery.ToString(),
+                        r => (TEntity)queryContext.StateManager
+                            .GetOrMaterializeEntry(
+                                queryContext.Model.GetEntityType(typeof(TEntity)),
+                                relationalQueryContext.ValueReaderFactory.Create(r)).Entity,
+                        queryContext.Logger);
                 }
             }
 
             private class RelationalProjectionSubQueryExpressionTreeVisitor : RelationalQueryingExpressionTreeVisitor
             {
-                public RelationalProjectionSubQueryExpressionTreeVisitor(EntityQueryModelVisitor parentQueryModelVisitor)
-                    : base(parentQueryModelVisitor)
+                public RelationalProjectionSubQueryExpressionTreeVisitor(
+                    QueryModelVisitor queryModelVisitor, IQuerySource querySource, bool isolateSubqueries)
+                    : base(queryModelVisitor, querySource, isolateSubqueries)
                 {
                 }
 
                 protected override Expression VisitSubQueryExpression(SubQueryExpression expression)
                 {
-                    return VisitProjectionSubQuery(expression, new QueryModelVisitor(_parentQueryModelVisitor));
+                    return VisitProjectionSubQuery(expression, new QueryModelVisitor(_model));
                 }
             }
 
             private sealed class Enumerable<T> : IEnumerable<T>
             {
-                private readonly RelationalQueryContext _queryContext;
+                private readonly RelationalConnection _connection;
                 private readonly string _sql;
-                private readonly IEntityType _entityType;
+                private readonly Func<DbDataReader, T> _shaper;
+                private readonly ILogger _logger;
 
-                public Enumerable(RelationalQueryContext queryContext, string sql, IEntityType entityType)
+                public Enumerable(
+                    RelationalConnection connection,
+                    string sql,
+                    Func<DbDataReader, T> shaper,
+                    ILogger logger)
                 {
-                    _queryContext = queryContext;
+                    _connection = connection;
                     _sql = sql;
-                    _entityType = entityType;
+                    _shaper = shaper;
+                    _logger = logger;
                 }
 
                 public IEnumerator<T> GetEnumerator()
                 {
-                    return new Enumerator<T>(_queryContext, _sql, _entityType);
+                    return new Enumerator(this);
                 }
 
                 IEnumerator IEnumerable.GetEnumerator()
                 {
                     return GetEnumerator();
                 }
-            }
 
-            private sealed class Enumerator<T> : IEnumerator<T>
-            {
-                private readonly RelationalQueryContext _queryContext;
-                private readonly string _sql;
-                private readonly IEntityType _entityType;
-
-                private RelationalConnection _connection;
-                private DbCommand _command;
-                private DbDataReader _reader;
-
-                public Enumerator(RelationalQueryContext queryContext, string sql, IEntityType entityType)
+                private sealed class Enumerator : IEnumerator<T>
                 {
-                    _queryContext = queryContext;
-                    _sql = sql;
-                    _entityType = entityType;
-                }
+                    private readonly Enumerable<T> _enumerable;
 
-                public bool MoveNext()
-                {
-                    if (_reader == null)
+                    private DbCommand _command;
+                    private DbDataReader _reader;
+
+                    public Enumerator(Enumerable<T> enumerable)
                     {
-                        Contract.Assert(_connection == null);
-
-                        var connection = _queryContext.Connection;
-                        connection.Open();
-                        _connection = connection;
-
-                        _command = _connection.DbConnection.CreateCommand();
-                        _command.CommandText = _sql;
-
-                        _queryContext.Logger.WriteSql(_sql);
-
-                        _reader = _command.ExecuteReader();
+                        _enumerable = enumerable;
                     }
 
-                    return _reader.Read();
-                }
-
-                public T Current
-                {
-                    get
+                    public bool MoveNext()
                     {
                         if (_reader == null)
                         {
-                            return default(T);
+                            _enumerable._connection.Open();
+
+                            _command = _enumerable._connection.DbConnection.CreateCommand();
+                            _command.CommandText = _enumerable._sql;
+
+                            _enumerable._logger.WriteSql(_enumerable._sql);
+
+                            _reader = _command.ExecuteReader();
                         }
 
-                        return (T)_queryContext.StateManager
-                            .GetOrMaterializeEntry(
-                                _entityType, _queryContext.ValueReaderFactory.Create(_reader)).Entity;
+                        return _reader.Read();
                     }
-                }
 
-                object IEnumerator.Current
-                {
-                    get { return Current; }
-                }
-
-                public void Dispose()
-                {
-                    if (_reader != null)
+                    public T Current
                     {
-                        _reader.Dispose();
+                        get
+                        {
+                            if (_reader == null)
+                            {
+                                return default(T);
+                            }
+
+                            return _enumerable._shaper(_reader);
+                        }
                     }
 
-                    if (_command != null)
+                    object IEnumerator.Current
                     {
-                        _command.Dispose();
+                        get { return Current; }
                     }
 
-                    if (_connection != null)
+                    public void Dispose()
                     {
-                        _connection.Close();
-                    }
-                }
+                        if (_reader != null)
+                        {
+                            _reader.Dispose();
+                        }
 
-                public void Reset()
-                {
-                    throw new NotImplementedException();
+                        if (_command != null)
+                        {
+                            _command.Dispose();
+                        }
+
+                        if (_enumerable._connection != null)
+                        {
+                            _enumerable._connection.Close();
+                        }
+                    }
+
+                    public void Reset()
+                    {
+                        throw new NotImplementedException();
+                    }
                 }
             }
         }

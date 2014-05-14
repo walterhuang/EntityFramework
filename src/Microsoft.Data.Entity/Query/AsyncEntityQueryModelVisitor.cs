@@ -8,6 +8,7 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
+using Microsoft.Data.Entity.Metadata;
 using Microsoft.Data.Entity.Utilities;
 using Remotion.Linq;
 using Remotion.Linq.Clauses;
@@ -18,14 +19,16 @@ namespace Microsoft.Data.Entity.Query
 {
     public abstract class AsyncEntityQueryModelVisitor : EntityQueryModelVisitor
     {
-        protected AsyncEntityQueryModelVisitor(EntityQueryModelVisitor parentQueryModelVisitor)
-            : base(new AsyncLinqOperatorProvider(), parentQueryModelVisitor)
+        protected AsyncEntityQueryModelVisitor(IModel model)
+            : base(model, new AsyncLinqOperatorProvider())
         {
         }
 
         public new Func<QueryContext, IAsyncEnumerable<TResult>> CreateQueryExecutor<TResult>([NotNull] QueryModel queryModel)
         {
             Check.NotNull(queryModel, "queryModel");
+
+            _isRootVisitor = true;
 
             VisitQueryModel(queryModel);
 

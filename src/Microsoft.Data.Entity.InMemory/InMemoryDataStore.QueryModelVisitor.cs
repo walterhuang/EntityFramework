@@ -9,6 +9,7 @@ using System.Reflection;
 using JetBrains.Annotations;
 using Microsoft.Data.Entity.Metadata;
 using Microsoft.Data.Entity.Query;
+using Remotion.Linq.Clauses;
 using Remotion.Linq.Clauses.Expressions;
 using Remotion.Linq.Parsing;
 
@@ -18,24 +19,21 @@ namespace Microsoft.Data.Entity.InMemory
     {
         private class QueryModelVisitor : EntityQueryModelVisitor
         {
-            public QueryModelVisitor()
-                : base(null)
+            public QueryModelVisitor(IModel model)
+                : base(model)
             {
             }
 
-            private QueryModelVisitor(EntityQueryModelVisitor parentQueryModelVisitor)
-                : base(parentQueryModelVisitor)
+            protected override ExpressionTreeVisitor CreateQueryingExpressionTreeVisitor(
+                IQuerySource querySource, bool isolateSubqueries = false)
             {
+                return new InMemoryQueryingExpressionTreeVisitor(_model, isolateSubqueries);
             }
 
-            protected override ExpressionTreeVisitor CreateQueryingExpressionTreeVisitor(EntityQueryModelVisitor parentQueryModelVisitor)
+            protected override ExpressionTreeVisitor CreateProjectionExpressionTreeVisitor(
+                IQuerySource querySource, bool isolateSubqueries = false)
             {
-                return new InMemoryQueryingExpressionTreeVisitor(parentQueryModelVisitor);
-            }
-
-            protected override ExpressionTreeVisitor CreateProjectionExpressionTreeVisitor(EntityQueryModelVisitor parentQueryModelVisitor)
-            {
-                return new InMemoryProjectionSubQueryExpressionTreeVisitor(parentQueryModelVisitor);
+                return new InMemoryProjectionSubQueryExpressionTreeVisitor(_model, isolateSubqueries);
             }
 
             private static readonly MethodInfo _entityScanMethodInfo
@@ -53,14 +51,14 @@ namespace Microsoft.Data.Entity.InMemory
 
             private class InMemoryQueryingExpressionTreeVisitor : QueryingExpressionTreeVisitor
             {
-                public InMemoryQueryingExpressionTreeVisitor(EntityQueryModelVisitor queryModelVisitor)
-                    : base(queryModelVisitor)
+                public InMemoryQueryingExpressionTreeVisitor(IModel model, bool isolateSubqueries)
+                    : base(model, isolateSubqueries)
                 {
                 }
 
                 protected override Expression VisitSubQueryExpression(SubQueryExpression expression)
                 {
-                    var queryModelVisitor = new QueryModelVisitor(_parentQueryModelVisitor);
+                    var queryModelVisitor = new QueryModelVisitor(_model) { _isRootVisitor = _isolateSubqueries };
 
                     queryModelVisitor.VisitQueryModel(expression.QueryModel);
 
@@ -77,14 +75,14 @@ namespace Microsoft.Data.Entity.InMemory
 
             private class InMemoryProjectionSubQueryExpressionTreeVisitor : InMemoryQueryingExpressionTreeVisitor
             {
-                public InMemoryProjectionSubQueryExpressionTreeVisitor(EntityQueryModelVisitor queryModelVisitor)
-                    : base(queryModelVisitor)
+                public InMemoryProjectionSubQueryExpressionTreeVisitor(IModel model, bool isolateSubqueries)
+                    : base(model, isolateSubqueries)
                 {
                 }
 
                 protected override Expression VisitSubQueryExpression(SubQueryExpression expression)
                 {
-                    return VisitProjectionSubQuery(expression, new QueryModelVisitor(_parentQueryModelVisitor));
+                    return VisitProjectionSubQuery(expression, new QueryModelVisitor(_model));
                 }
             }
         }
