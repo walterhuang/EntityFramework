@@ -19,7 +19,7 @@ namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
             [Fact]
             public async Task Can_query_with_implicit_services_and_OnConfiguring()
             {
-                using (await TestDatabase.Northwind())
+                using (await SqlServerTestDatabase.Northwind())
                 {
                     using (var context = new NorthwindContext())
                     {
@@ -34,7 +34,7 @@ namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
 
                 protected override void OnConfiguring(DbContextOptions builder)
                 {
-                    builder.UseSqlServer(TestDatabase.NorthwindConnectionString);
+                    builder.UseSqlServer(SqlServerTestDatabase.NorthwindConnectionString);
                 }
 
                 protected override void OnModelCreating(ModelBuilder builder)
@@ -49,10 +49,10 @@ namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
             [Fact]
             public async Task Can_query_with_implicit_services_and_explicit_config()
             {
-                using (await TestDatabase.Northwind())
+                using (await SqlServerTestDatabase.Northwind())
                 {
                     var configuration = new DbContextOptions()
-                        .UseSqlServer(TestDatabase.NorthwindConnectionString)
+                        .UseSqlServer(SqlServerTestDatabase.NorthwindConnectionString)
                         .BuildConfiguration();
 
                     using (var context = new NorthwindContext(configuration))
@@ -83,7 +83,7 @@ namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
             [Fact]
             public async Task Can_query_with_explicit_services_and_OnConfiguring()
             {
-                using (await TestDatabase.Northwind())
+                using (await SqlServerTestDatabase.Northwind())
                 {
                     var serviceCollection = new ServiceCollection();
                     serviceCollection.AddEntityFramework().AddSqlServer();
@@ -107,7 +107,7 @@ namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
 
                 protected override void OnConfiguring(DbContextOptions builder)
                 {
-                    builder.UseSqlServer(TestDatabase.NorthwindConnectionString);
+                    builder.UseSqlServer(SqlServerTestDatabase.NorthwindConnectionString);
                 }
 
                 protected override void OnModelCreating(ModelBuilder builder)
@@ -122,14 +122,14 @@ namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
             [Fact]
             public async Task Can_query_with_explicit_services_and_explicit_config()
             {
-                using (await TestDatabase.Northwind())
+                using (await SqlServerTestDatabase.Northwind())
                 {
                     var serviceCollection = new ServiceCollection();
                     serviceCollection.AddEntityFramework().AddSqlServer();
                     var serviceProvider = serviceCollection.BuildServiceProvider();
 
                     var configuration = new DbContextOptions()
-                        .UseSqlServer(TestDatabase.NorthwindConnectionString)
+                        .UseSqlServer(SqlServerTestDatabase.NorthwindConnectionString)
                         .BuildConfiguration();
 
                     using (var context = new NorthwindContext(serviceProvider, configuration))
@@ -160,7 +160,7 @@ namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
             [Fact]
             public async Task Throws_on_attempt_to_use_SQL_Server_without_providing_connection_string()
             {
-                using (await TestDatabase.Northwind())
+                using (await SqlServerTestDatabase.Northwind())
                 {
                     var serviceCollection = new ServiceCollection();
                     serviceCollection.AddEntityFramework().AddSqlServer();
@@ -199,7 +199,7 @@ namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
             [Fact]
             public async Task Throws_on_attempt_to_use_context_with_no_store()
             {
-                using (await TestDatabase.Northwind())
+                using (await SqlServerTestDatabase.Northwind())
                 {
                     Assert.Equal(
                         GetString("FormatNoDataStoreConfigured"),
@@ -229,7 +229,7 @@ namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
             [Fact]
             public async Task Throws_on_attempt_to_use_store_with_no_store_services()
             {
-                using (await TestDatabase.Northwind())
+                using (await SqlServerTestDatabase.Northwind())
                 {
                     var serviceCollection = new ServiceCollection();
                     serviceCollection.AddEntityFramework();
@@ -258,7 +258,7 @@ namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
 
                 protected override void OnConfiguring(DbContextOptions builder)
                 {
-                    builder.UseSqlServer(TestDatabase.NorthwindConnectionString);
+                    builder.UseSqlServer(SqlServerTestDatabase.NorthwindConnectionString);
                 }
 
                 protected override void OnModelCreating(ModelBuilder builder)
@@ -280,7 +280,7 @@ namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
                     .AddTransient<MyController, MyController>()
                     .BuildServiceProvider();
 
-                using (await TestDatabase.Northwind())
+                using (await SqlServerTestDatabase.Northwind())
                 {
                     await serviceProvider.GetService<MyController>().TestAsync();
                 }
@@ -315,7 +315,7 @@ namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
 
                 protected override void OnConfiguring(DbContextOptions builder)
                 {
-                    builder.UseSqlServer(TestDatabase.NorthwindConnectionString);
+                    builder.UseSqlServer(SqlServerTestDatabase.NorthwindConnectionString);
                 }
 
                 protected override void OnModelCreating(ModelBuilder builder)
@@ -331,7 +331,7 @@ namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
             public async Task Can_register_context_and_configuration_with_DI_container_and_have_both_injected()
             {
                 var configuration = new DbContextOptions()
-                    .UseSqlServer(TestDatabase.NorthwindConnectionString)
+                    .UseSqlServer(SqlServerTestDatabase.NorthwindConnectionString)
                     .BuildConfiguration();
 
                 var serviceCollection = new ServiceCollection();
@@ -342,7 +342,7 @@ namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
                     .AddInstance(configuration);
                 var serviceProvider = serviceCollection.BuildServiceProvider();
 
-                using (await TestDatabase.Northwind())
+                using (await SqlServerTestDatabase.Northwind())
                 {
                     await serviceProvider.GetService<MyController>().TestAsync();
                 }
@@ -392,7 +392,7 @@ namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
             public async Task Can_register_configuration_with_DI_container_and_have_it_injected()
             {
                 var configuration = new DbContextOptions()
-                    .UseSqlServer(TestDatabase.NorthwindConnectionString)
+                    .UseSqlServer(SqlServerTestDatabase.NorthwindConnectionString)
                     .BuildConfiguration();
 
                 var serviceCollection = new ServiceCollection();
@@ -403,7 +403,7 @@ namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
                     .AddInstance(configuration);
                 var serviceProvider = serviceCollection.BuildServiceProvider();
 
-                using (await TestDatabase.Northwind())
+                using (await SqlServerTestDatabase.Northwind())
                 {
                     await serviceProvider.GetService<MyController>().TestAsync();
                 }
@@ -448,9 +448,9 @@ namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
             [Fact]
             public async Task Can_pass_connection_string_to_constructor_and_use_in_builder()
             {
-                using (await TestDatabase.Northwind())
+                using (await SqlServerTestDatabase.Northwind())
                 {
-                    using (var context = new NorthwindContext(TestDatabase.NorthwindConnectionString))
+                    using (var context = new NorthwindContext(SqlServerTestDatabase.NorthwindConnectionString))
                     {
                         Assert.Equal(91, await QueryableExtensions.CountAsync(context.Customers));
                     }
@@ -480,9 +480,9 @@ namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
             [Fact]
             public async Task Can_pass_connection_string_to_constructor_and_use_in_OnConfiguring()
             {
-                using (await TestDatabase.Northwind())
+                using (await SqlServerTestDatabase.Northwind())
                 {
-                    using (var context = new NorthwindContext(TestDatabase.NorthwindConnectionString))
+                    using (var context = new NorthwindContext(SqlServerTestDatabase.NorthwindConnectionString))
                     {
                         Assert.Equal(91, await QueryableExtensions.CountAsync(context.Customers));
                     }
@@ -517,7 +517,7 @@ namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
             [Fact]
             public async Task Can_use_one_context_nested_inside_another_of_the_same_type()
             {
-                using (await TestDatabase.Northwind())
+                using (await SqlServerTestDatabase.Northwind())
                 {
                     var serviceCollection = new ServiceCollection();
                     serviceCollection.AddEntityFramework().AddSqlServer();
@@ -560,7 +560,7 @@ namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
 
                 protected override void OnConfiguring(DbContextOptions builder)
                 {
-                    builder.UseSqlServer(TestDatabase.NorthwindConnectionString);
+                    builder.UseSqlServer(SqlServerTestDatabase.NorthwindConnectionString);
                 }
             }
         }
@@ -570,7 +570,7 @@ namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
             [Fact]
             public async Task Can_use_one_context_nested_inside_another_of_a_different_type()
             {
-                using (await TestDatabase.Northwind())
+                using (await SqlServerTestDatabase.Northwind())
                 {
                     var serviceCollection = new ServiceCollection();
                     serviceCollection.AddEntityFramework().AddSqlServer().AddInMemoryStore();
@@ -583,7 +583,7 @@ namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
             [Fact]
             public async Task Can_use_one_context_nested_inside_another_of_a_different_type_with_implicit_services()
             {
-                using (await TestDatabase.Northwind())
+                using (await SqlServerTestDatabase.Northwind())
                 {
                     await NestedContextTest(() => new BlogContext(), () => new NorthwindContext());
                 }
@@ -591,7 +591,7 @@ namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
 
             private async Task NestedContextTest(Func<BlogContext> createBlogContext, Func<NorthwindContext> createNorthwindContext)
             {
-                using (await TestDatabase.Northwind())
+                using (await SqlServerTestDatabase.Northwind())
                 {
                     using (var context0 = createBlogContext())
                     {
@@ -662,7 +662,7 @@ namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
 
                 protected override void OnConfiguring(DbContextOptions builder)
                 {
-                    builder.UseSqlServer(TestDatabase.NorthwindConnectionString);
+                    builder.UseSqlServer(SqlServerTestDatabase.NorthwindConnectionString);
                 }
             }
         }

@@ -1,21 +1,28 @@
 {
   "version": "0.1-alpha-*",
   "dependencies": {
+    "Ix-Async": "1.2.2",
+    "Microsoft.Data.Entity": "",
     "Microsoft.Data.Entity.Relational": "",
-    "Microsoft.Data.Entity.SQLite": "",
+    "Microsoft.Data.SQLite": "",
+    "Microsoft.Data.SQLite": "0.1-alpha-*",
+    "Microsoft.Framework.ConfigurationModel" : "0.1-alpha-*",
+    "Microsoft.Framework.DependencyInjection" : "0.1-alpha-*",
+    "Microsoft.Framework.Logging" : "0.1-alpha-*",
     "xunit.abstractions": "2.0.0-aspnet-*",
     "xunit.assert": "2.0.0-aspnet-*",
     "xunit.core": "2.0.0-aspnet-*",
     "xunit.execution": "2.0.0-aspnet-*",
     "Xunit.KRunner": "0.1-alpha-*"
   },
-  "code": "**\\*.cs;..\\Shared\\ApiConsistencyTestBase.cs",
+  "code": "**\\*.cs;..\\Shared\\TestDatabase.cs;..\\Shared\\Northwind.cs;..\\Shared\\NorthwindQueryTestBase.cs;..\\Shared\\NorthwindQueryFixtureBase.cs",
   "commands": {
     "test": "Xunit.KRunner"
   },
   "configurations": {
     "net451": {
       "dependencies": {
+        "System.Data": "",
         "System.Runtime": ""
       }
     },

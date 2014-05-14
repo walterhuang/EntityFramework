@@ -19,5 +19,10 @@ namespace Microsoft.Data.Entity.SQLite
             : base(configuration, connection, databaseBuilder, batchPreparer, batchExecutor)
         {
         }
+
+        protected override RelationalValueReaderFactory ValueReaderFactory
+        {
+            get { return new RelationalObjectArrayValueReaderFactory(); }
+        }
     }
 }

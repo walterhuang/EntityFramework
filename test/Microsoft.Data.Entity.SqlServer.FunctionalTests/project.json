@@ -19,7 +19,7 @@
     "xunit.execution": "2.0.0-aspnet-*",
     "Xunit.KRunner": "0.1-alpha-*"
   },
-  "code": "**\\*.cs;..\\Shared\\TestFileLogger.cs;..\\Shared\\Northwind.cs;..\\Shared\\NorthwindQueryTestBase.cs;..\\Shared\\NorthwindQueryFixtureBase.cs",
+  "code": "**\\*.cs;..\\Shared\\TestDatabase.cs;..\\Shared\\TestFileLogger.cs;..\\Shared\\Northwind.cs;..\\Shared\\NorthwindQueryTestBase.cs;..\\Shared\\NorthwindQueryFixtureBase.cs",
   "commands": {
     "test": "Xunit.KRunner"
   },

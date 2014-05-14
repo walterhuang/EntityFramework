@@ -23,7 +23,7 @@ namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
         [Fact]
         public async Task Can_run_linq_query_on_entity_set()
         {
-            using (await TestDatabase.Northwind())
+            using (await SqlServerTestDatabase.Northwind())
             {
                 using (var db = new NorthwindContext())
                 {
@@ -49,7 +49,7 @@ namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
         [Fact]
         public async Task Can_run_linq_query_on_entity_set_with_value_buffer_reader()
         {
-            using (await TestDatabase.Northwind())
+            using (await SqlServerTestDatabase.Northwind())
             {
                 var serviceCollection = new ServiceCollection();
                 serviceCollection.AddEntityFramework().AddSqlServer();
@@ -100,7 +100,7 @@ namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
         [Fact]
         public async Task Can_enumerate_entity_set()
         {
-            using (await TestDatabase.Northwind())
+            using (await SqlServerTestDatabase.Northwind())
             {
                 using (var db = new NorthwindContext())
                 {
@@ -120,7 +120,7 @@ namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
         [Fact]
         public async Task Can_save_changes()
         {
-            using (var testDatabase = await TestDatabase.Scratch())
+            using (var testDatabase = await SqlServerTestDatabase.Scratch())
             {
                 var configuration = new DbContextOptions()
                     .UseSqlServer(testDatabase.Connection.ConnectionString)
@@ -204,7 +204,7 @@ namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
 
         private async Task RoundTripChanges<TBlog>() where TBlog : class, IBlog, new()
         {
-            using (var testDatabase = await TestDatabase.Scratch())
+            using (var testDatabase = await SqlServerTestDatabase.Scratch())
             {
                 var configuration = new DbContextOptions()
                     .UseSqlServer(testDatabase.Connection.ConnectionString)
@@ -340,7 +340,7 @@ namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
 
             protected override void OnConfiguring(DbContextOptions builder)
             {
-                builder.UseSqlServer(TestDatabase.NorthwindConnectionString);
+                builder.UseSqlServer(SqlServerTestDatabase.NorthwindConnectionString);
             }
 
             protected override void OnModelCreating(ModelBuilder builder)

@@ -12,10 +12,11 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.Entity.Relational;
+using Microsoft.Data.FunctionalTests;
 
 namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
 {
-    public class TestDatabase : IDisposable, IDbCommandExecutor
+    public class SqlServerTestDatabase : TestDatabase, IDisposable, IDbCommandExecutor
     {
         public const int CommandTimeout = 5;
         private const string DefaultDatabaseName = "Microsoft.Data.SqlServer.FunctionalTest";
@@ -31,9 +32,9 @@ namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
         /// <summary>
         ///     A transactional test database, pre-populated with Northwind schema/data
         /// </summary>
-        public static Task<TestDatabase> Northwind()
+        public static Task<SqlServerTestDatabase> Northwind()
         {
-            return new TestDatabase()
+            return new SqlServerTestDatabase()
                 .CreateShared(name: NorthwindDatabaseName, scriptPath: @"..\..\..\Northwind.sql"); // relative from bin/<config>
         }
 
@@ -45,9 +46,9 @@ namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
         /// <summary>
         ///     The default empty transactional test database.
         /// </summary>
-        public static Task<TestDatabase> Default()
+        public static Task<SqlServerTestDatabase> Default()
         {
-            return new TestDatabase()
+            return new SqlServerTestDatabase()
                 .CreateShared(name: DefaultDatabaseName);
         }
 
@@ -60,21 +61,21 @@ namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
         ///     A non-transactional, transient, isolated test database. Use this in the case
         ///     where transactions are not appropriate.
         /// </summary>
-        public static Task<TestDatabase> Scratch(bool createDatabase = true)
+        public static Task<SqlServerTestDatabase> Scratch(bool createDatabase = true)
         {
-            return new TestDatabase()
+            return new SqlServerTestDatabase()
                 .CreateScratch(name: "Microsoft.Data.SqlServer.Scratch_" + Interlocked.Increment(ref _scratchCount), createDatabase: createDatabase);
         }
 
         private SqlConnection _connection;
         private SqlTransaction _transaction;
 
-        private TestDatabase()
+        private SqlServerTestDatabase()
         {
             // Use async static factory method
         }
 
-        private async Task<TestDatabase> CreateShared(string name, string scriptPath = null)
+        private async Task<SqlServerTestDatabase> CreateShared(string name, string scriptPath = null)
         {
             if (!_createdDatabases.Contains(name))
             {
@@ -157,7 +158,7 @@ namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
             }
         }
 
-        private async Task<TestDatabase> CreateScratch(string name, bool createDatabase)
+        private async Task<SqlServerTestDatabase> CreateScratch(string name, bool createDatabase)
         {
             using (var master = new SqlConnection(CreateConnectionString("master")))
             {
@@ -276,46 +277,6 @@ namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
                     IntegratedSecurity = true,
                     ConnectTimeout = 30
                 }.ConnectionString;
-        }
-
-        private sealed class AsyncLock
-        {
-            private readonly SemaphoreSlim _semaphore = new SemaphoreSlim(1, 1);
-            private readonly Task<IDisposable> _releaser;
-
-            public AsyncLock()
-            {
-                _releaser = Task.FromResult<IDisposable>(new Releaser(this));
-            }
-
-            public Task<IDisposable> LockAsync()
-            {
-                var waitTask = _semaphore.WaitAsync();
-
-                return waitTask.IsCompleted
-                    ? _releaser
-                    : waitTask.ContinueWith(
-                        (_, state) => (IDisposable)state,
-                        _releaser.Result,
-                        CancellationToken.None,
-                        TaskContinuationOptions.ExecuteSynchronously,
-                        TaskScheduler.Default);
-            }
-
-            private sealed class Releaser : IDisposable
-            {
-                private readonly AsyncLock _asyncLock;
-
-                public Releaser(AsyncLock asyncLock)
-                {
-                    _asyncLock = asyncLock;
-                }
-
-                public void Dispose()
-                {
-                    _asyncLock._semaphore.Release();
-                }
-            }
         }
     }
 }

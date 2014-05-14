@@ -22,7 +22,7 @@ namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
                 values.Add(await sequentialGuidIdentityGenerator.NextAsync(CancellationToken.None));
             }
 
-            using (var testDatabase = await TestDatabase.Default())
+            using (var testDatabase = await SqlServerTestDatabase.Default())
             {
                 await testDatabase.ExecuteNonQueryAsync("CREATE TABLE SequentialGuidTest (value uniqueidentifier)");
 

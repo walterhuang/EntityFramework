@@ -3,7 +3,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Runtime.Remoting.Messaging;
 using System.Threading.Tasks;
 using Microsoft.Data.Entity.Relational;
@@ -14,7 +13,7 @@ using Microsoft.Framework.DependencyInjection.Fallback;
 using Microsoft.Framework.Logging;
 using Xunit;
 
-namespace Microsoft.Data.Entity.SqlServer.FunctionalTests
+namespace Microsoft.Data.Entity.SQLite.FunctionalTests
 {
     public class NorthwindQueryTest : NorthwindQueryTestBase, IClassFixture<NorthwindQueryFixture>
     {
@@ -344,24 +343,24 @@ FROM Customers",
 
         private readonly IServiceProvider _serviceProvider;
         private readonly ImmutableDbContextOptions _configuration;
-        private readonly SqlServerTestDatabase _testDatabase;
+        private readonly SQLiteTestDatabase _testDatabase;
 
         public NorthwindQueryFixture()
         {
             _serviceProvider
                 = new ServiceCollection()
                     .AddEntityFramework()
-                    .AddSqlServer()
+                    .AddSQLite()
                     .UseLoggerFactory(_loggingFactory)
                     .ServiceCollection
                     .BuildServiceProvider();
 
-            _testDatabase = SqlServerTestDatabase.Northwind().Result;
+            _testDatabase = SQLiteTestDatabase.Northwind().Result;
 
             _configuration
                 = new DbContextOptions()
                     .UseModel(CreateModel())
-                    .UseSqlServer(_testDatabase.Connection.ConnectionString)
+                    .UseSQLite(_testDatabase.Connection.ConnectionString)
                     .BuildConfiguration();
         }
 
