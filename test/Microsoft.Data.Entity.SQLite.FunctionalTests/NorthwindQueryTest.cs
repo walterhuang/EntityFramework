@@ -279,6 +279,26 @@ FROM Customers",
                 _fixture.Sql);
         }
 
+        public override void OrderByDescending_ThenBy()
+        {
+            base.OrderByDescending_ThenBy();
+
+            Assert.Equal(
+                @"SELECT CustomerID, Country, City
+FROM Customers",
+                _fixture.Sql);
+        }
+
+        public override void SelectMany_correlated_simple()
+        {
+            base.SelectMany_correlated_simple();
+
+            Assert.Equal(
+                @"SELECT CustomerID, Country, City
+FROM Customers",
+                _fixture.Sql);
+        }
+
         private readonly NorthwindQueryFixture _fixture;
 
         public NorthwindQueryTest(NorthwindQueryFixture fixture)

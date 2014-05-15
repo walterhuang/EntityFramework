@@ -26,7 +26,7 @@ namespace Microsoft.Data.Entity.SQLite.FunctionalTests
         public static Task<SQLiteTestDatabase> Northwind()
         {
             return new SQLiteTestDatabase()
-                .CreateShared(name: NorthwindDatabaseName, filename: @"..\..\..\Northwind.sl3"); // relative from bin/<config>
+                .CreateShared(name: NorthwindDatabaseName, filename: @"..\..\..\Northwind.db3"); // relative from bin/<config>
         }
 
         private async Task<SQLiteTestDatabase> CreateShared(string name, string filename = null)
